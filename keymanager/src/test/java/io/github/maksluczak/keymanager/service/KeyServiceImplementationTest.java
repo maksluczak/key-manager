@@ -38,12 +38,15 @@ class KeyServiceImplementationTest {
 
     @Test
     void shouldCreateKeySuccessfully() {
+        // given
         KeyRequest request = new KeyRequest();
         request.setName("radio-key-1");
 
+        // when
         when(repository.save(any(CryptoKey.class)))
                 .thenAnswer(invocationOnMock -> invocationOnMock.getArgument(0));
 
+        // then
         KeyResponse response = keyService.createKey(request);
 
         assertThat(response.getName()).isEqualTo("radio-key-1");
@@ -54,32 +57,42 @@ class KeyServiceImplementationTest {
 
     @Test
     void shouldThrowWhenKeyNotFound() {
+        // given
         UUID id = UUID.randomUUID();
+
+        // when
         when(repository.findById(id)).thenReturn(Optional.empty());
 
+        // then
         assertThrows(KeyNotFoundException.class, () -> keyService.getKey(id));
         verify(repository).findById(id);
     }
 
     @Test
     void shouldRotateActiveKey() {
+        // given
         UUID id = UUID.randomUUID();
         CryptoKey key = activeKey(id);
 
+        // when
         when(repository.findById(id)).thenReturn(Optional.of(key));
 
+        // then
         KeyResponse response = keyService.rotateKey(id);
         assertThat(response.getStatus()).isEqualTo("ROTATED");
     }
 
     @Test
     void shouldThrowWhenRotatingAlreadyRotatedKey() {
+        // given
         UUID id = UUID.randomUUID();
         CryptoKey key = activeKey(id);
         key.setStatus(CryptoKey.KeyStatus.ROTATED);
 
+        // when
         when(repository.findById(id)).thenReturn(Optional.of(key));
 
+        // then
         assertThrows(KeyAlreadyRotatedException.class, () -> keyService.rotateKey(id));
         verify(repository, never()).save(any());
     }
@@ -87,12 +100,15 @@ class KeyServiceImplementationTest {
     @ParameterizedTest
     @EnumSource(value = CryptoKey.KeyStatus.class, names = {"ROTATED", "REVOKED"})
     void shouldThrowWhenRotatingNonActiveKey(CryptoKey.KeyStatus status) {
+        // given
         UUID id = UUID.randomUUID();
         CryptoKey key = activeKey(id);
         key.setStatus(status);
 
+        //when
         when(repository.findById(id)).thenReturn(Optional.of(key));
 
+        // then
         assertThrows(RuntimeException.class, () -> keyService.rotateKey(id));
     }
 
