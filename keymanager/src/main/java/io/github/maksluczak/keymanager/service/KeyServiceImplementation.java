@@ -58,6 +58,7 @@ public class KeyServiceImplementation implements KeyService {
 
         key.setStatus(CryptoKey.KeyStatus.ROTATED);
         key.setRotatedAt(Instant.now());
+        repository.save(key);
         return KeyResponse.from(key);
     }
 
@@ -67,5 +68,6 @@ public class KeyServiceImplementation implements KeyService {
                 .orElseThrow();
 
         key.setStatus(CryptoKey.KeyStatus.REVOKED);
+        repository.save(key);
     }
 }

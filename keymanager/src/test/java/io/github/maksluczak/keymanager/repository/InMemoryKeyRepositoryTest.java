@@ -78,25 +78,31 @@ class InMemoryKeyRepositoryTest {
 
     @Test
     void shouldDeleteKey() {
+        // given
         CryptoKey key = new CryptoKey();
         key.setId(UUID.randomUUID());
         key.setName("radio-key-1");
 
+        // when
         repository.save(key);
 
         repository.deleteById(key.getId());
 
+        // then
         assertFalse(repository.findById(key.getId()).isPresent());
     }
 
     @Test
     void shouldCheckIfNameExists() {
+        // given
         CryptoKey key = new CryptoKey();
         key.setId(UUID.randomUUID());
         key.setName("radio-key-1");
 
+        // when
         repository.save(key);
 
+        // then
         assertTrue(repository.existsByName("radio-key-1"));
         assertFalse(repository.existsByName("radio-key-x"));
     }

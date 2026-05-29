@@ -19,9 +19,10 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,15 +43,16 @@ class KeyServiceImplementationTest {
         KeyRequest request = new KeyRequest();
         request.setName("radio-key-1");
 
-        // when
-        when(repository.save(any(CryptoKey.class)))
-                .thenAnswer(invocationOnMock -> invocationOnMock.getArgument(0));
+        given(repository.save(any(CryptoKey.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
 
-        // then
+        // when
         KeyResponse response = keyService.createKey(request);
 
+        // then
         assertThat(response.getName()).isEqualTo("radio-key-1");
-        assertThat(response.getStatus()).isEqualTo(CryptoKey.KeyStatus.ACTIVE.toString());
+        assertThat(response.getStatus()).isEqualTo("ACTIVE");
+
         verify(repository).save(any(CryptoKey.class));
         verify(validator).validateUniqueName("radio-key-1");
     }
@@ -60,11 +62,14 @@ class KeyServiceImplementationTest {
         // given
         UUID id = UUID.randomUUID();
 
-        // when
-        when(repository.findById(id)).thenReturn(Optional.empty());
+        given(repository.findById(id))
+                .willReturn(Optional.empty());
 
+        // when
         // then
-        assertThrows(KeyNotFoundException.class, () -> keyService.getKey(id));
+        assertThatThrownBy(() -> keyService.getKey(id))
+                .isInstanceOf(KeyNotFoundException.class);
+
         verify(repository).findById(id);
     }
 
@@ -74,12 +79,16 @@ class KeyServiceImplementationTest {
         UUID id = UUID.randomUUID();
         CryptoKey key = activeKey(id);
 
+        given(repository.findById(id))
+                .willReturn(Optional.of(key));
+
         // when
-        when(repository.findById(id)).thenReturn(Optional.of(key));
+        KeyResponse response = keyService.rotateKey(id);
 
         // then
-        KeyResponse response = keyService.rotateKey(id);
         assertThat(response.getStatus()).isEqualTo("ROTATED");
+
+        verify(repository).save(key);
     }
 
     @Test
@@ -89,12 +98,34 @@ class KeyServiceImplementationTest {
         CryptoKey key = activeKey(id);
         key.setStatus(CryptoKey.KeyStatus.ROTATED);
 
+        given(repository.findById(id))
+                .willReturn(Optional.of(key));
+
         // when
-        when(repository.findById(id)).thenReturn(Optional.of(key));
+        // then
+        assertThatThrownBy(() -> keyService.rotateKey(id))
+                .isInstanceOf(KeyAlreadyRotatedException.class);
+
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void shouldRevokeActiveKey() {
+        // given
+        UUID id = UUID.randomUUID();
+        CryptoKey key = activeKey(id);
+
+        given(repository.findById(id))
+                .willReturn(Optional.of(key));
+
+        // when
+        keyService.revokeKey(id);
 
         // then
-        assertThrows(KeyAlreadyRotatedException.class, () -> keyService.rotateKey(id));
-        verify(repository, never()).save(any());
+        assertThat(key.getStatus())
+                .isEqualTo(CryptoKey.KeyStatus.REVOKED);
+
+        verify(repository).save(key);
     }
 
     @ParameterizedTest
@@ -105,11 +136,15 @@ class KeyServiceImplementationTest {
         CryptoKey key = activeKey(id);
         key.setStatus(status);
 
-        //when
-        when(repository.findById(id)).thenReturn(Optional.of(key));
+        given(repository.findById(id))
+                .willReturn(Optional.of(key));
 
+        // when
         // then
-        assertThrows(RuntimeException.class, () -> keyService.rotateKey(id));
+        assertThatThrownBy(() -> keyService.rotateKey(id))
+                .isInstanceOf(RuntimeException.class);
+
+        verify(repository, never()).save(any());
     }
 
     private CryptoKey activeKey(UUID id) {
